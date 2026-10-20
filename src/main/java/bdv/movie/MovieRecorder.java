@@ -7,6 +7,14 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleConsumer;
 
@@ -44,6 +52,9 @@ public class MovieRecorder
 		@Override public int getHeight() { return height; }
 	}
 
+	/** Upper bound on PNG writer threads (each holds one frame in memory). */
+	private static final int MAX_WRITERS = 4;
+
 	/** @return number of frames written */
 	public static int record(
 			final ViewerPanel viewer,
@@ -65,53 +76,112 @@ public class MovieRecorder
 
 		final Target target = new Target( width, height );
 		final int threads = Math.max( 1, Runtime.getRuntime().availableProcessors() );
+		final ForkJoinPool renderPool = new ForkJoinPool( threads );
 		final MultiResolutionRenderer renderer = new MultiResolutionRenderer(
-				target, () -> {}, new double[] { 1 }, 0, threads, null, false, new CacheControl.Dummy() );
+				target, () -> {}, new double[] { 1 }, 0, threads, renderPool, false, new CacheControl.Dummy() );
 
 		final ScaleBarOverlayRenderer scalebar = scaleBar ? new ScaleBarOverlayRenderer() : null;
 		final MultiBoxOverlayRenderer box = boxOverlay ? new MultiBoxOverlayRenderer( width, height ) : null;
 		final int nTimepoints = renderState.getNumTimepoints();
-		final BufferedImage frame = new BufferedImage( width, height, BufferedImage.TYPE_INT_RGB );
 
-		int i = 0;
-		for ( final MovieSequence.Step step : steps )
+		// ImageIO's PNG encoder is single-threaded and slow at high resolution
+		// (~0.5 s for a 4K frame). Encode on a few writer threads while the
+		// next frame renders. Frame buffers are recycled through a bounded queue,
+		// which also limits the number of frames in flight (memory).
+		final int writers = Math.max( 1, Math.min( MAX_WRITERS, threads / 2 ) );
+		final ExecutorService writePool = Executors.newFixedThreadPool( writers );
+		final BlockingQueue< BufferedImage > freeFrames = new ArrayBlockingQueue<>( writers + 1 );
+		for ( int k = 0; k < writers + 1; ++k )
+			freeFrames.add( new BufferedImage( width, height, BufferedImage.TYPE_INT_RGB ) );
+		final AtomicInteger written = new AtomicInteger();
+		final AtomicReference< Throwable > writeError = new AtomicReference<>();
+
+		int submitted = 0;
+		try
 		{
-			if ( cancelled.getAsBoolean() )
-				break;
-			renderState.setViewerTransform( step.transform );
-			if ( step.timepoint != null && step.timepoint >= 0 && step.timepoint < nTimepoints )
-				renderState.setCurrentTimepoint( step.timepoint );
-
-			renderer.requestRepaint();
-			renderer.paint( renderState );
-
-			// The render result is ARGB and empty space is fully transparent,
-			// which most viewers/encoders show as white. Flatten onto black,
-			// like the live viewer does.
-			final Graphics2D g2 = frame.createGraphics();
-			g2.setColor( Color.BLACK );
-			g2.fillRect( 0, 0, width, height );
-			g2.drawImage( target.renderResult.getBufferedImage(), 0, 0, null );
-			if ( scalebar != null || box != null )
+			for ( final MovieSequence.Step step : steps )
 			{
-				g2.setRenderingHint( RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON );
-				g2.setClip( 0, 0, width, height );
-				if ( scalebar != null )
+				if ( cancelled.getAsBoolean() || writeError.get() != null )
+					break;
+				renderState.setViewerTransform( step.transform );
+				if ( step.timepoint != null && step.timepoint >= 0 && step.timepoint < nTimepoints )
+					renderState.setCurrentTimepoint( step.timepoint );
+
+				renderer.requestRepaint();
+				renderer.paint( renderState );
+
+				final BufferedImage frame = freeFrames.take();
+
+				// The render result is ARGB and empty space is fully transparent,
+				// which most viewers/encoders show as white. Flatten onto black,
+				// like the live viewer does.
+				final Graphics2D g2 = frame.createGraphics();
+				g2.setColor( Color.BLACK );
+				g2.fillRect( 0, 0, width, height );
+				g2.drawImage( target.renderResult.getBufferedImage(), 0, 0, null );
+				if ( scalebar != null || box != null )
 				{
-					scalebar.setViewerState( renderState );
-					scalebar.paint( g2 );
+					g2.setRenderingHint( RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON );
+					g2.setClip( 0, 0, width, height );
+					if ( scalebar != null )
+					{
+						scalebar.setViewerState( renderState );
+						scalebar.paint( g2 );
+					}
+					if ( box != null )
+					{
+						box.setViewerState( renderState );
+						box.paint( g2 );
+					}
 				}
-				if ( box != null )
-				{
-					box.setViewerState( renderState );
-					box.paint( g2 );
-				}
+				g2.dispose();
+
+				final File file = new File( dir, String.format( "img-%05d.png", submitted ) );
+				++submitted;
+				writePool.execute( () -> {
+					try
+					{
+						if ( writeError.get() == null )
+						{
+							ImageIO.write( frame, "png", file );
+							progress.accept( ( double ) written.incrementAndGet() / steps.size() );
+						}
+					}
+					catch ( final Throwable t )
+					{
+						writeError.compareAndSet( null, t );
+					}
+					finally
+					{
+						freeFrames.add( frame );
+					}
+				} );
 			}
-			g2.dispose();
-			ImageIO.write( frame, "png", new File( dir, String.format( "img-%05d.png", i ) ) );
-			++i;
-			progress.accept( ( double ) i / steps.size() );
 		}
-		return i;
+		catch ( final InterruptedException e )
+		{
+			Thread.currentThread().interrupt();
+		}
+		finally
+		{
+			// let frames that are already rendered finish writing
+			writePool.shutdown();
+			try
+			{
+				writePool.awaitTermination( 1, TimeUnit.DAYS );
+			}
+			catch ( final InterruptedException e )
+			{
+				Thread.currentThread().interrupt();
+			}
+			renderPool.shutdown();
+		}
+
+		final Throwable err = writeError.get();
+		if ( err instanceof IOException )
+			throw ( IOException ) err;
+		if ( err != null )
+			throw new IOException( err );
+		return submitted;
 	}
 }
