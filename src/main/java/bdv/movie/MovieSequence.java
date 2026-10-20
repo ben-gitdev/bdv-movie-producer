@@ -45,6 +45,29 @@ public class MovieSequence
 	}
 
 	/**
+	 * Returns a copy of {@code t} whose linear part has positive determinant.
+	 * <p>
+	 * Viewer transforms can contain a reflection, e.g. BigStitcher's
+	 * {@code BDVPopup.initTransform} produces a negative scale for data rotated
+	 * by 90 degrees. {@link SimilarityTransformAnimator} extracts a rotation
+	 * quaternion and gives garbage for such transforms. BDV only renders the
+	 * screen plane z = 0, so negating the screen-z row yields the identical
+	 * image while making the transform a proper similarity.
+	 */
+	static AffineTransform3D properRotation( final AffineTransform3D t )
+	{
+		final AffineTransform3D a = t.copy();
+		final double det =
+				a.get( 0, 0 ) * ( a.get( 1, 1 ) * a.get( 2, 2 ) - a.get( 1, 2 ) * a.get( 2, 1 ) )
+				- a.get( 0, 1 ) * ( a.get( 1, 0 ) * a.get( 2, 2 ) - a.get( 1, 2 ) * a.get( 2, 0 ) )
+				+ a.get( 0, 2 ) * ( a.get( 1, 0 ) * a.get( 2, 1 ) - a.get( 1, 1 ) * a.get( 2, 0 ) );
+		if ( det < 0 )
+			for ( int c = 0; c < 4; ++c )
+				a.set( -a.get( 2, c ), 2, c );
+		return a;
+	}
+
+	/**
 	 * @param keyframes
 	 *            at least two keyframes
 	 * @param width,height
@@ -76,7 +99,7 @@ public class MovieSequence
 		final AffineTransform3D[] tc = new AffineTransform3D[ n ];
 		for ( int i = 0; i < n; ++i )
 		{
-			tc[ i ] = t[ i ].copy();
+			tc[ i ] = properRotation( t[ i ] );
 			tc[ i ].set( tc[ i ].get( 0, 3 ) - cX, 0, 3 );
 			tc[ i ].set( tc[ i ].get( 1, 3 ) - cY, 1, 3 );
 		}
