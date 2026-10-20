@@ -1,12 +1,18 @@
 package bdv.movie;
 
+import java.awt.AWTEvent;
+import java.awt.GraphicsEnvironment;
+import java.awt.Toolkit;
 import java.awt.Window;
+import java.awt.event.AWTEventListener;
+import java.awt.event.WindowEvent;
 
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 
 import org.scijava.ui.behaviour.io.InputTriggerConfig;
 import org.scijava.ui.behaviour.util.Actions;
@@ -20,7 +26,47 @@ public final class MovieProducer
 	public static final String KEY = "F7";
 	private static final String CLIENT_KEY = MovieProducer.class.getName();
 
+	private static AWTEventListener autoAttachListener;
+
 	private MovieProducer() {}
+
+	/**
+	 * Installs (once per JVM) a listener that attaches the movie producer to
+	 * every BDV window when it is opened or activated, and attaches to the
+	 * BDV windows that are already open. Safe to call repeatedly from any
+	 * thread; called both from {@link MovieProducerAutoAttach} and from
+	 * {@link MovieProducerKeys}, so it runs even if one hook is never hit.
+	 */
+	public static synchronized void installAutoAttach()
+	{
+		if ( autoAttachListener != null || GraphicsEnvironment.isHeadless() )
+			return;
+		autoAttachListener = event -> {
+			final int id = event.getID();
+			if ( ( id == WindowEvent.WINDOW_OPENED || id == WindowEvent.WINDOW_ACTIVATED )
+					&& event.getSource() instanceof ViewerFrame )
+				attachLater( ( ViewerFrame ) event.getSource() );
+		};
+		Toolkit.getDefaultToolkit().addAWTEventListener( autoAttachListener, AWTEvent.WINDOW_EVENT_MASK );
+		// visible (not just displayable): BDV sets the menu bar before showing the window
+		for ( final Window w : Window.getWindows() )
+			if ( w instanceof ViewerFrame && w.isVisible() )
+				attachLater( ( ViewerFrame ) w );
+	}
+
+	private static void attachLater( final ViewerFrame frame )
+	{
+		SwingUtilities.invokeLater( () -> {
+			try
+			{
+				attach( frame );
+			}
+			catch ( final Throwable t )
+			{
+				t.printStackTrace(); // never break BDV because of us
+			}
+		} );
+	}
 
 	/** Idempotent: calling it twice on the same window does nothing extra. */
 	public static synchronized ProduceMovieDialog attach( final ViewerFrame frame )

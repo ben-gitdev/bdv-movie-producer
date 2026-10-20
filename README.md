@@ -11,7 +11,8 @@ one small jar alongside it.
 
 * **F7** or **Tools › Produce Movie (keyframes)** in every BDV window
   (including windows opened by BigStitcher, Multiview Reconstruction, scripts).
-  This is wired up automatically at Fiji start-up.
+  This is wired up automatically when a BDV window is created (the shortcut
+  is also listed under BDV's Preferences › Keymap).
 * Fallback command: **Plugins › BigDataViewer › Movie Producer (keyframes)**,
   which attaches to the most recently active BDV window.
 * Add keyframes with **+**, set per-transition frame count and easing
