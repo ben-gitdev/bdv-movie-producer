@@ -48,19 +48,15 @@ mvn package
 
 The plugin is `target/bigdataviewer-movie-producer-0.1.0-SNAPSHOT.jar`.
 
-No local toolchain? Push this folder to a GitHub repository: the included
+No local toolchain? Fork this repository on GitHub: the included
 workflow (`.github/workflows/build.yml`) builds it and attaches the jar as a
 downloadable artifact under the **Actions** tab.
+
+Or simply download the compiled jar from the Releases.
 
 ## Install
 
 Copy the jar into `Fiji.app/plugins/` (or `Fiji.app/jars/`) and restart Fiji.
-The jar is plain Java bytecode, so a jar built on Linux works unchanged on
-Windows and macOS.
-
-To share it with others, create a personal Fiji update site
-(<https://imagej.net/update-sites/setup>) and upload the jar there; users then
-enable your site under *Help › Update… › Manage update sites*.
 
 ## Making a movie from the PNGs
 
