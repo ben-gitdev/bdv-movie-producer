@@ -67,13 +67,27 @@ public class MovieSequence
 			t[ i ] = remap( f.getTransform(), cw, ch, width, height );
 		}
 
+		// SimilarityTransformAnimator expects transforms with the rotation
+		// centre already subtracted and adds (cX, cY) back in get(), so pass
+		// centre-relative transforms (as BDV's ViewerPanel does). Passing the
+		// raw transforms shifts every in-between frame by (w/2, h/2).
+		final double cX = width / 2.0;
+		final double cY = height / 2.0;
+		final AffineTransform3D[] tc = new AffineTransform3D[ n ];
+		for ( int i = 0; i < n; ++i )
+		{
+			tc[ i ] = t[ i ].copy();
+			tc[ i ].set( tc[ i ].get( 0, 3 ) - cX, 0, 3 );
+			tc[ i ].set( tc[ i ].get( 1, 3 ) - cY, 1, 3 );
+		}
+
 		final List< Step > steps = new ArrayList<>();
 		for ( int k = 1; k < n; ++k )
 		{
 			final MovieFrame prev = keyframes.get( k - 1 );
 			final MovieFrame cur = keyframes.get( k );
 			final SimilarityTransformAnimator animator =
-					new SimilarityTransformAnimator( t[ k - 1 ], t[ k ], width / 2.0, height / 2.0, 0 );
+					new SimilarityTransformAnimator( tc[ k - 1 ], tc[ k ], cX, cY, 0 );
 			final int frames = Math.max( 0, cur.getFrames() );
 			for ( int d = 0; d < frames; d += Math.max( 1, stride ) )
 			{
