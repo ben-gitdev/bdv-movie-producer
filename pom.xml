@@ -10,8 +10,7 @@
 		<relativePath />
 	</parent>
 
-	<!-- TODO: change groupId to something you own, e.g. io.github.yourname -->
-	<groupId>io.github.bdvmovie</groupId>
+	<groupId>io.github.ben-gitdev</groupId>
 	<artifactId>bigdataviewer-movie-producer</artifactId>
 	<version>0.1.0-SNAPSHOT</version>
 
