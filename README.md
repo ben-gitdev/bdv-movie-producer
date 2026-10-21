@@ -21,6 +21,16 @@ one small jar alongside it.
   and render a PNG sequence at any resolution with optional scale bar and box
   overlay.
 
+![Produce Movie (keyframes) in the BDV Tools menu](docs/images/tools-menu.png)
+
+*The movie producer in BDV's Tools menu (shortcut F7).*
+
+![The Produce Movie dialog with three keyframes](docs/images/produce-movie-dialog.png)
+
+*The Produce Movie dialog: preview controls on top, the keyframe strip with
+per-transition frame count and easing, and export / import / record on the
+right.*
+
 ### Changes vs. the original fork
 
 * Builds against current `bigdataviewer-core` (pom-scijava 44) instead of a
@@ -35,7 +45,24 @@ one small jar alongside it.
   BDV window or recording at a different resolution keeps the same framing.
 * Optional: keyframes capture the current **timepoint**, and the timepoint is
   interpolated between keyframes (for time-lapse data). Untick
-  "Capture timepoint with keyframe" for a purely spatial fly-through.
+  "timepoint" under "New keyframes capture" for a purely spatial fly-through.
+* Optional: keyframes capture **channels & display settings**: which
+  sources/channels and groups are visible, the display mode, and each
+  source's display range (brightness/contrast) and color.
+  * Visibility switches when a keyframe is reached: during the transition
+    into keyframe *B* you see keyframe *A*'s channels. To switch channels
+    without moving, add two keyframes at the same view; the "Frames" value of
+    the second is how long the first channel is held.
+  * Display ranges and colors are interpolated between keyframes with the
+    same easing as the camera (e.g. fade a channel in by ramping its maximum).
+  * Right-click a keyframe to go to it, replace it with the current view, or
+    update / clear only its channel & display settings. Hover a keyframe to
+    see what it stores; "ch" in its title means display settings are stored.
+  * Settings are matched to sources by index, so they apply to the same
+    dataset only (a JSON with a different number of sources is ignored, with
+    a warning). Keyframes without display settings leave the display as is.
+  * While recording, BDV's live window shows the changing display ranges and
+    colors (they are shared with the viewer); they are restored afterwards.
 
 ## Build
 

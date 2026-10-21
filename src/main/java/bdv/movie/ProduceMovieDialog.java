@@ -25,7 +25,9 @@ import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
@@ -35,8 +37,8 @@ import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import bdv.viewer.ConverterSetups;
 import bdv.viewer.ViewerPanel;
-import net.imglib2.realtransform.AffineTransform3D;
 
 /**
  * Keyframe editor: add/remove keyframes, preview, export/import JSON,
@@ -47,13 +49,15 @@ public class ProduceMovieDialog extends JDialog
 	private static final long serialVersionUID = 1L;
 
 	private final ViewerPanel viewer;
+	private final ConverterSetups setups;
 	private final PreviewPlayer preview;
 	private final List< MovieFramePanel > framePanels = new ArrayList<>();
 	private final JPanel framesStrip = new JPanel( new FlowLayout( FlowLayout.LEFT ) );
 
 	private final JSpinner strideSpinner = new JSpinner( new SpinnerNumberModel( 10, 1, 1000, 1 ) );
 	private final JSpinner sleepSpinner = new JSpinner( new SpinnerNumberModel( 50, 1, 5000, 10 ) );
-	private final JCheckBox interpolateTime = new JCheckBox( "Capture timepoint with keyframe", true );
+	private final JCheckBox interpolateTime = new JCheckBox( "timepoint", true );
+	private final JCheckBox captureDisplay = new JCheckBox( "channels & display settings", true );
 
 	private final JButton removeButton = new JButton( "\u2212" );
 	private final JButton exportJsonButton = new JButton( "Export JSON\u2026" );
@@ -65,11 +69,12 @@ public class ProduceMovieDialog extends JDialog
 
 	private File lastDir = new File( System.getProperty( "user.home" ) );
 
-	public ProduceMovieDialog( final Frame owner, final ViewerPanel viewer )
+	public ProduceMovieDialog( final Frame owner, final ViewerPanel viewer, final ConverterSetups setups )
 	{
 		super( owner, "Produce Movie", false );
 		this.viewer = viewer;
-		this.preview = new PreviewPlayer( viewer );
+		this.setups = setups;
+		this.preview = new PreviewPlayer( viewer, setups );
 
 		// --- preview row
 		final JPanel previewRow = new JPanel( new FlowLayout( FlowLayout.LEFT ) );
@@ -84,7 +89,22 @@ public class ProduceMovieDialog extends JDialog
 		stop.addActionListener( e -> preview.stop() );
 		previewRow.add( play );
 		previewRow.add( stop );
-		previewRow.add( interpolateTime );
+
+		// --- what a new keyframe captures besides the view
+		final JPanel captureRow = new JPanel( new FlowLayout( FlowLayout.LEFT ) );
+		captureRow.add( new JLabel( "New keyframes capture:" ) );
+		interpolateTime.setToolTipText( "Store the timepoint; it is interpolated between keyframes" );
+		captureDisplay.setToolTipText( "<html>Store visible channels/sources, display mode, display ranges and colors.<br>"
+				+ "Ranges and colors are interpolated; visibility switches when a keyframe is reached.</html>" );
+		captureRow.add( interpolateTime );
+		captureRow.add( captureDisplay );
+		final JLabel hint = new JLabel( "  (right-click a keyframe to go to / update it)" );
+		hint.setEnabled( false );
+		captureRow.add( hint );
+
+		final JPanel top = new JPanel( new GridLayout( 2, 1 ) );
+		top.add( previewRow );
+		top.add( captureRow );
 
 		// --- keyframe strip
 		final JPanel addRemove = new JPanel( new GridLayout( 2, 1, 0, 4 ) );
@@ -132,7 +152,7 @@ public class ProduceMovieDialog extends JDialog
 		progressRow.setBorder( BorderFactory.createEmptyBorder( 4, 6, 6, 6 ) );
 
 		getContentPane().setLayout( new BorderLayout() );
-		getContentPane().add( previewRow, BorderLayout.NORTH );
+		getContentPane().add( top, BorderLayout.NORTH );
 		getContentPane().add( center, BorderLayout.CENTER );
 		getContentPane().add( progressRow, BorderLayout.SOUTH );
 
@@ -167,16 +187,82 @@ public class ProduceMovieDialog extends JDialog
 
 	private void addCurrentView()
 	{
-		final AffineTransform3D t = viewer.state().getViewerTransform();
-		final Integer tp = interpolateTime.isSelected() ? viewer.state().getCurrentTimepoint() : null;
-		final MovieFrame f = new MovieFrame( framePanels.size(), t,
-				viewer.getDisplay().getWidth(), viewer.getDisplay().getHeight(), tp );
+		final MovieFrame f = new MovieFrame( framePanels.size(), viewer.state().getViewerTransform(), 0, 0, null );
+		captureView( f );
+		captureDisplay( f );
 		addPanel( f, MovieFramePanel.snapshot( viewer ) );
+	}
+
+	/** Stores the current view (and timepoint, if enabled) in {@code f}. */
+	private void captureView( final MovieFrame f )
+	{
+		f.setTransform( viewer.state().getViewerTransform() );
+		f.setCanvasSize( viewer.getDisplay().getWidth(), viewer.getDisplay().getHeight() );
+		f.setTimepoint( interpolateTime.isSelected() ? viewer.state().getCurrentTimepoint() : null );
+	}
+
+	/** Stores the current channels / display settings (if enabled) in {@code f}. */
+	private void captureDisplay( final MovieFrame f )
+	{
+		f.setDisplay( captureDisplay.isSelected() ? DisplaySettings.capture( viewer.state(), setups ) : null );
+	}
+
+	/** Shows keyframe {@code f} in the live viewer. Must be called on the EDT. */
+	private void goTo( final MovieFrame f )
+	{
+		final int w = viewer.getDisplay().getWidth();
+		final int h = viewer.getDisplay().getHeight();
+		viewer.state().setViewerTransform( MovieSequence.remap( f.getTransform(),
+				f.getCanvasWidth(), f.getCanvasHeight(), w, h ) );
+		final Integer tp = f.getTimepoint();
+		if ( tp != null && tp >= 0 && tp < viewer.state().getNumTimepoints() )
+			viewer.state().setCurrentTimepoint( tp );
+		if ( f.getDisplay() != null )
+		{
+			f.getDisplay().applyVisibility( viewer.state() );
+			f.getDisplay().applyConverters( viewer.state(), setups );
+		}
+	}
+
+	private JPopupMenu keyframeMenu( final MovieFramePanel p )
+	{
+		final JPopupMenu menu = new JPopupMenu();
+		final JMenuItem go = new JMenuItem( "Go to this keyframe" );
+		go.addActionListener( e -> {
+			preview.stop();
+			goTo( p.getMovieFrame() );
+		} );
+		final JMenuItem replace = new JMenuItem( "Replace with current view" );
+		replace.setToolTipText( "View, timepoint and channels/display settings (as enabled above)" );
+		replace.addActionListener( e -> {
+			captureView( p.getMovieFrame() );
+			captureDisplay( p.getMovieFrame() );
+			p.refresh( MovieFramePanel.snapshot( viewer ) );
+		} );
+		final JMenuItem display = new JMenuItem( "Update channels & display settings only" );
+		display.setToolTipText( "Keep this keyframe's view; take channels, ranges and colors from the viewer" );
+		display.addActionListener( e -> {
+			p.getMovieFrame().setDisplay( DisplaySettings.capture( viewer.state(), setups ) );
+			p.refresh( null );
+		} );
+		final JMenuItem clear = new JMenuItem( "Clear channels & display settings" );
+		clear.setToolTipText( "This keyframe will not change channels, ranges or colors" );
+		clear.addActionListener( e -> {
+			p.getMovieFrame().setDisplay( null );
+			p.refresh( null );
+		} );
+		menu.add( go );
+		menu.addSeparator();
+		menu.add( replace );
+		menu.add( display );
+		menu.add( clear );
+		return menu;
 	}
 
 	private void addPanel( final MovieFrame f, final BufferedImage thumb )
 	{
 		final MovieFramePanel p = new MovieFramePanel( f, thumb );
+		p.setComponentPopupMenu( keyframeMenu( p ) );
 		framePanels.add( p );
 		framesStrip.add( p );
 		framesStrip.revalidate();
@@ -255,19 +341,27 @@ public class ProduceMovieDialog extends JDialog
 		while ( !framePanels.isEmpty() )
 			removeLast();
 
+		int mismatched = 0;
+		for ( final MovieFrame f : loaded )
+		{
+			if ( f.getDisplay() != null && !f.getDisplay().matches( viewer.state() ) )
+			{
+				f.setDisplay( null );
+				++mismatched;
+			}
+		}
+		if ( mismatched > 0 )
+			error( mismatched + " keyframe(s) have channel/display settings for a different number of sources\n"
+					+ "than this viewer has; those settings were ignored." );
+
 		// Visit each keyframe in the live viewer to grab a thumbnail. Runs on
 		// a worker thread so the viewer can actually render in between.
 		new Thread( () -> {
-			final int nTp = viewer.state().getNumTimepoints();
 			try
 			{
 				for ( final MovieFrame f : loaded )
 				{
-					SwingUtilities.invokeAndWait( () -> {
-						viewer.state().setViewerTransform( f.getTransform() );
-						if ( f.getTimepoint() != null && f.getTimepoint() >= 0 && f.getTimepoint() < nTp )
-							viewer.state().setCurrentTimepoint( f.getTimepoint() );
-					} );
+					SwingUtilities.invokeAndWait( () -> goTo( f ) );
 					Thread.sleep( 300 );
 					SwingUtilities.invokeAndWait( () -> addPanel( f, MovieFramePanel.snapshot( viewer ) ) );
 				}
@@ -341,7 +435,7 @@ public class ProduceMovieDialog extends JDialog
 			final long t0 = System.nanoTime();
 			try
 			{
-				final int n = MovieRecorder.record( viewer, frames, width, height, scaleBar, box, dir,
+				final int n = MovieRecorder.record( viewer, setups, frames, width, height, scaleBar, box, dir,
 						p -> SwingUtilities.invokeLater( () -> {
 							progressBar.setValue( ( int ) ( 1000 * p ) );
 							progressBar.setString( String.format( "Recording\u2026 %.0f%%", 100 * p ) );

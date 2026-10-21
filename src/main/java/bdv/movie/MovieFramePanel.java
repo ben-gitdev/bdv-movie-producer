@@ -6,6 +6,8 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.GridLayout;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.BorderFactory;
 import javax.swing.JComboBox;
@@ -21,21 +23,22 @@ public class MovieFramePanel extends JPanel
 	private static final long serialVersionUID = 1L;
 
 	private final MovieFrame movieFrame;
+	private final TitledBorder title;
+	private final Thumbnail thumbnail;
 	private final JTextField framesField;
 	private final JComboBox< String > accelField;
 
 	public MovieFramePanel( final MovieFrame movieFrame, final BufferedImage thumbnail )
 	{
 		this.movieFrame = movieFrame;
-		String label = String.valueOf( movieFrame.getPosition() );
-		if ( movieFrame.getTimepoint() != null )
-			label += "  (t=" + movieFrame.getTimepoint() + ")";
-		final TitledBorder title = BorderFactory.createTitledBorder( BorderFactory.createLineBorder( Color.lightGray ), label );
+		title = BorderFactory.createTitledBorder( BorderFactory.createLineBorder( Color.lightGray ), "" );
 		title.setTitleJustification( TitledBorder.CENTER );
 		setBorder( title );
 		setPreferredSize( new Dimension( 140, 180 ) );
 
-		add( new Thumbnail( thumbnail ) );
+		this.thumbnail = new Thumbnail( thumbnail );
+		this.thumbnail.setInheritsPopupMenu( true );
+		add( this.thumbnail );
 
 		final Font small = getFont().deriveFont( 10f );
 		framesField = new JTextField( String.valueOf( movieFrame.getFrames() ), 4 );
@@ -58,7 +61,35 @@ public class MovieFramePanel extends JPanel
 		final JPanel fields = new JPanel( new GridLayout( 2, 1 ) );
 		fields.add( row );
 		fields.add( accelField );
+		row.setInheritsPopupMenu( true );
+		fields.setInheritsPopupMenu( true );
 		add( fields );
+		refresh( null );
+	}
+
+	/**
+	 * Updates title and tooltip from the keyframe, and the thumbnail if
+	 * {@code newThumbnail} is not null.
+	 */
+	public void refresh( final BufferedImage newThumbnail )
+	{
+		final List< String > tags = new ArrayList<>();
+		if ( movieFrame.getTimepoint() != null )
+			tags.add( "t=" + movieFrame.getTimepoint() );
+		if ( movieFrame.getDisplay() != null )
+			tags.add( "ch" );
+		String label = String.valueOf( movieFrame.getPosition() );
+		if ( !tags.isEmpty() )
+			label += "  (" + String.join( ", ", tags ) + ")";
+		title.setTitle( label );
+		final String tip = movieFrame.getDisplay() != null
+				? movieFrame.getDisplay().describe()
+				: "No channel/display settings stored: the display is left as it is.";
+		setToolTipText( tip );
+		thumbnail.setToolTipText( tip );
+		if ( newThumbnail != null )
+			thumbnail.image = newThumbnail;
+		repaint();
 	}
 
 	/** Reads the text fields back into the keyframe and returns it. */
@@ -79,7 +110,7 @@ public class MovieFramePanel extends JPanel
 	private static class Thumbnail extends JComponent
 	{
 		private static final long serialVersionUID = 1L;
-		private final BufferedImage image;
+		private BufferedImage image;
 
 		Thumbnail( final BufferedImage image )
 		{

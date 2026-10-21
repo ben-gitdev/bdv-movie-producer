@@ -4,6 +4,7 @@ import java.util.List;
 
 import javax.swing.SwingUtilities;
 
+import bdv.viewer.ConverterSetups;
 import bdv.viewer.ViewerPanel;
 
 /**
@@ -14,11 +15,13 @@ import bdv.viewer.ViewerPanel;
 public class PreviewPlayer
 {
 	private final ViewerPanel viewer;
+	private final ConverterSetups setups;
 	private volatile Thread thread;
 
-	public PreviewPlayer( final ViewerPanel viewer )
+	public PreviewPlayer( final ViewerPanel viewer, final ConverterSetups setups )
 	{
 		this.viewer = viewer;
+		this.setups = setups;
 	}
 
 	public synchronized void play( final List< MovieFrame > keyframes, final int stride, final int sleepMs )
@@ -39,6 +42,11 @@ public class PreviewPlayer
 						viewer.state().setViewerTransform( s.transform );
 						if ( s.timepoint != null && s.timepoint >= 0 && s.timepoint < nTimepoints )
 							viewer.state().setCurrentTimepoint( s.timepoint );
+						if ( s.display != null )
+						{
+							s.display.applyVisibility( viewer.state() );
+							s.display.applyConverters( viewer.state(), setups );
+						}
 					} );
 					Thread.sleep( Math.max( 1, sleepMs ) );
 				}

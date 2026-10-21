@@ -6,6 +6,7 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -19,9 +20,11 @@ import java.util.function.BooleanSupplier;
 import java.util.function.DoubleConsumer;
 
 import javax.imageio.ImageIO;
+import javax.swing.SwingUtilities;
 
 import bdv.cache.CacheControl;
 import bdv.viewer.BasicViewerState;
+import bdv.viewer.ConverterSetups;
 import bdv.viewer.Interpolation;
 import bdv.viewer.ViewerPanel;
 import bdv.viewer.ViewerState;
@@ -58,6 +61,7 @@ public class MovieRecorder
 	/** @return number of frames written */
 	public static int record(
 			final ViewerPanel viewer,
+			final ConverterSetups setups,
 			final List< MovieFrame > keyframes,
 			final int width,
 			final int height,
@@ -96,9 +100,18 @@ public class MovieRecorder
 		final AtomicInteger written = new AtomicInteger();
 		final AtomicReference< Throwable > writeError = new AtomicReference<>();
 
+		// Visibility is applied to our snapshot only, but display ranges and
+		// colors live in converters shared with the viewer: they are changed
+		// on the EDT while recording and restored afterwards.
+		final DisplaySettings[] original = new DisplaySettings[ 1 ];
+		DisplaySettings appliedConverters = null;
+
 		int submitted = 0;
 		try
 		{
+			onEdt( () -> original[ 0 ] = DisplaySettings.capture( renderState, setups ) );
+			appliedConverters = original[ 0 ];
+
 			for ( final MovieSequence.Step step : steps )
 			{
 				if ( cancelled.getAsBoolean() || writeError.get() != null )
@@ -106,6 +119,15 @@ public class MovieRecorder
 				renderState.setViewerTransform( step.transform );
 				if ( step.timepoint != null && step.timepoint >= 0 && step.timepoint < nTimepoints )
 					renderState.setCurrentTimepoint( step.timepoint );
+				if ( step.display != null )
+				{
+					step.display.applyVisibility( renderState );
+					if ( !step.display.sameConverters( appliedConverters ) )
+					{
+						onEdt( () -> step.display.applyConverters( renderState, setups ) );
+						appliedConverters = step.display;
+					}
+				}
 
 				renderer.requestRepaint();
 				renderer.paint( renderState );
@@ -164,6 +186,9 @@ public class MovieRecorder
 		}
 		finally
 		{
+			if ( original[ 0 ] != null && appliedConverters != original[ 0 ] )
+				SwingUtilities.invokeLater( () -> original[ 0 ].applyConverters( renderState, setups ) );
+
 			// let frames that are already rendered finish writing
 			writePool.shutdown();
 			try
@@ -183,5 +208,17 @@ public class MovieRecorder
 		if ( err != null )
 			throw new IOException( err );
 		return submitted;
+	}
+
+	private static void onEdt( final Runnable r ) throws InterruptedException, IOException
+	{
+		try
+		{
+			SwingUtilities.invokeAndWait( r );
+		}
+		catch ( final InvocationTargetException e )
+		{
+			throw new IOException( e.getCause() );
+		}
 	}
 }
