@@ -25,6 +25,9 @@ public class MovieFrame
 	/** Added: timepoint when captured (null = old JSON, keep current timepoint). */
 	private Integer timepoint;
 
+	/** Added: channels / display settings when captured (null = keep current display). */
+	private DisplaySettings display;
+
 	public MovieFrame( final int position, final AffineTransform3D transform, final int canvasWidth, final int canvasHeight, final Integer timepoint )
 	{
 		this.position = position;
@@ -46,6 +49,9 @@ public class MovieFrame
 	public void setAccel( final int accel ) { this.accel = accel; }
 	public int getCanvasWidth() { return canvasWidth; }
 	public int getCanvasHeight() { return canvasHeight; }
+	public void setCanvasSize( final int width, final int height ) { canvasWidth = width; canvasHeight = height; }
 	public Integer getTimepoint() { return timepoint; }
 	public void setTimepoint( final Integer timepoint ) { this.timepoint = timepoint; }
+	public DisplaySettings getDisplay() { return display; }
+	public void setDisplay( final DisplaySettings display ) { this.display = display; }
 }

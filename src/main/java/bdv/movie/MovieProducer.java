@@ -76,7 +76,7 @@ public final class MovieProducer
 		if ( existing instanceof ProduceMovieDialog )
 			return ( ProduceMovieDialog ) existing;
 
-		final ProduceMovieDialog dialog = new ProduceMovieDialog( frame, frame.getViewerPanel() );
+		final ProduceMovieDialog dialog = new ProduceMovieDialog( frame, frame.getViewerPanel(), frame.getConverterSetups() );
 		root.putClientProperty( CLIENT_KEY, dialog );
 
 		final Runnable toggle = () -> dialog.setVisible( !dialog.isVisible() );

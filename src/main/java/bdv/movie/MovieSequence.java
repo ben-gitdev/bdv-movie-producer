@@ -8,7 +8,7 @@ import net.imglib2.realtransform.AffineTransform3D;
 
 /**
  * Turns a list of keyframes into the per-frame viewer transforms (and
- * timepoints) for a screen of a given size.
+ * timepoints and display settings) for a screen of a given size.
  * <p>
  * Viewer transforms map to screen pixels, so a transform captured in a
  * 900x600 window shows a different region when rendered at 1920x1080.
@@ -22,11 +22,14 @@ public class MovieSequence
 	{
 		public final AffineTransform3D transform;
 		public final Integer timepoint;
+		/** null = leave the display as it is. */
+		public final DisplaySettings display;
 
-		Step( final AffineTransform3D transform, final Integer timepoint )
+		Step( final AffineTransform3D transform, final Integer timepoint, final DisplaySettings display )
 		{
 			this.transform = transform;
 			this.timepoint = timepoint;
+			this.display = display;
 		}
 	}
 
@@ -115,15 +118,29 @@ public class MovieSequence
 			for ( int d = 0; d < frames; d += Math.max( 1, stride ) )
 			{
 				final double lin = ( double ) d / frames;
-				final AffineTransform3D tkd = animator.get( Accel.apply( lin, cur.getAccel() ) );
+				final double eased = Accel.apply( lin, cur.getAccel() );
+				final AffineTransform3D tkd = animator.get( eased );
 				Integer tp = null;
 				if ( prev.getTimepoint() != null && cur.getTimepoint() != null )
 					tp = ( int ) Math.round( prev.getTimepoint() + lin * ( cur.getTimepoint() - prev.getTimepoint() ) );
-				steps.add( new Step( tkd, tp ) );
+				steps.add( new Step( tkd, tp, display( prev.getDisplay(), cur.getDisplay(), eased ) ) );
 			}
 		}
 		// land exactly on the last keyframe
-		steps.add( new Step( t[ n - 1 ].copy(), keyframes.get( n - 1 ).getTimepoint() ) );
+		final MovieFrame last = keyframes.get( n - 1 );
+		steps.add( new Step( t[ n - 1 ].copy(), last.getTimepoint(), last.getDisplay() ) );
 		return steps;
+	}
+
+	/**
+	 * Display for a frame of the transition {@code prev -> cur}: ranges and
+	 * colors follow the same easing as the camera; visibility switches when
+	 * {@code cur} is reached.
+	 */
+	private static DisplaySettings display( final DisplaySettings prev, final DisplaySettings cur, final double eased )
+	{
+		if ( prev == null )
+			return null;
+		return cur == null ? prev : DisplaySettings.interpolate( prev, cur, eased );
 	}
 }
