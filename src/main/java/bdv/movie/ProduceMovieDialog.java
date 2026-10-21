@@ -338,6 +338,7 @@ public class ProduceMovieDialog extends JDialog
 
 		new Thread( () -> {
 			String msg;
+			final long t0 = System.nanoTime();
 			try
 			{
 				final int n = MovieRecorder.record( viewer, frames, width, height, scaleBar, box, dir,
@@ -346,7 +347,8 @@ public class ProduceMovieDialog extends JDialog
 							progressBar.setString( String.format( "Recording\u2026 %.0f%%", 100 * p ) );
 						} ),
 						cancelRecording::get );
-				msg = ( cancelRecording.get() ? "Cancelled after " : "Wrote " ) + n + " frames to " + dir;
+				msg = String.format( "%s%d frames to %s (%.1f s)", cancelRecording.get() ? "Cancelled after " : "Wrote ",
+						n, dir, ( System.nanoTime() - t0 ) * 1e-9 );
 			}
 			catch ( final Throwable e )
 			{
