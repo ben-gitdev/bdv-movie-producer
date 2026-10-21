@@ -21,6 +21,16 @@ one small jar alongside it.
   and render a PNG sequence at any resolution with optional scale bar and box
   overlay.
 
+![Produce Movie (keyframes) in the BDV Tools menu](docs/images/tools-menu.png)
+
+*The movie producer in BDV's Tools menu (shortcut F7).*
+
+![The Produce Movie dialog with three keyframes](docs/images/produce-movie-dialog.png)
+
+*The Produce Movie dialog: preview controls on top, the keyframe strip with
+per-transition frame count and easing, and export / import / record on the
+right.*
+
 ### Changes vs. the original fork
 
 * Builds against current `bigdataviewer-core` (pom-scijava 44) instead of a
