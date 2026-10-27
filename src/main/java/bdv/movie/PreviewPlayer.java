@@ -24,12 +24,12 @@ public class PreviewPlayer
 		this.setups = setups;
 	}
 
-	public synchronized void play( final List< MovieFrame > keyframes, final int stride, final int sleepMs )
+	public synchronized void play( final List< MovieFrame > keyframes, final int stride, final int sleepMs, final int easeFrames )
 	{
 		stop();
 		final int w = viewer.getDisplay().getWidth();
 		final int h = viewer.getDisplay().getHeight();
-		final List< MovieSequence.Step > steps = MovieSequence.build( keyframes, w, h, w, h, stride );
+		final List< MovieSequence.Step > steps = MovieSequence.build( keyframes, w, h, w, h, stride, easeFrames );
 		final int nTimepoints = viewer.state().getNumTimepoints();
 		final Thread t = new Thread( () -> {
 			try

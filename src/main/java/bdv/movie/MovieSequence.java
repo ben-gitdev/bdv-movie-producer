@@ -79,9 +79,12 @@ public class MovieSequence
 	 *            canvas size assumed for keyframes from old JSON files
 	 * @param stride
 	 *            1 for full output, n to take every n-th frame (preview)
+	 * @param easeFrames
+	 *            number of frames the ease-in / ease-out curves spend
+	 *            accelerating / decelerating (the whole transition if longer)
 	 */
 	public static List< Step > build( final List< MovieFrame > keyframes, final int width, final int height,
-			final int fallbackW, final int fallbackH, final int stride )
+			final int fallbackW, final int fallbackH, final int stride, final int easeFrames )
 	{
 		final int n = keyframes.size();
 		final AffineTransform3D[] t = new AffineTransform3D[ n ];
@@ -118,7 +121,7 @@ public class MovieSequence
 			for ( int d = 0; d < frames; d += Math.max( 1, stride ) )
 			{
 				final double lin = ( double ) d / frames;
-				final double eased = Accel.apply( lin, cur.getAccel() );
+				final double eased = Accel.apply( lin, cur.getAccel(), ( double ) easeFrames / frames );
 				final AffineTransform3D tkd = animator.get( eased );
 				Integer tp = null;
 				if ( prev.getTimepoint() != null && cur.getTimepoint() != null )
