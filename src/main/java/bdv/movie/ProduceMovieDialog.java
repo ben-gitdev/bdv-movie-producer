@@ -105,11 +105,11 @@ public class ProduceMovieDialog extends JDialog
 
 		// --- easing length, shared by all keyframes
 		final JPanel easeRow = new JPanel( new FlowLayout( FlowLayout.LEFT ) );
-		easeRow.add( new JLabel( "Ease-in / ease-out length:" ) );
+		easeRow.add( new JLabel( "Easing length:" ) );
 		easeRow.add( easeSpinner );
-		easeRow.add( new JLabel( "frames" ) );
-		easeSpinner.setToolTipText( "<html>Frames the ease-in / ease-out curves spend speeding up / slowing down;<br>"
-				+ "the rest of the transition runs at constant speed. Transitions with fewer frames ease throughout.</html>" );
+		easeRow.add( new JLabel( "frames (all keyframes)" ) );
+		easeSpinner.setToolTipText( "<html>Frames spent speeding up (ease-in) or slowing down (ease-out), or each of both (symmetric);<br>"
+				+ "the rest of the transition runs at constant speed. Shorter transitions ease throughout.</html>" );
 
 		final JPanel top = new JPanel( new GridLayout( 3, 1 ) );
 		top.add( previewRow );
@@ -322,7 +322,7 @@ public class ProduceMovieDialog extends JDialog
 		lastDir = file.getParentFile();
 		try
 		{
-			MovieFramesSerializer.save( keyframes(), file );
+			MovieFramesSerializer.save( keyframes(), ( Integer ) easeSpinner.getValue(), file );
 		}
 		catch ( final Exception e )
 		{
@@ -341,7 +341,10 @@ public class ProduceMovieDialog extends JDialog
 		final List< MovieFrame > loaded;
 		try
 		{
-			loaded = MovieFramesSerializer.load( file );
+			final MovieFramesSerializer.Movie movie = MovieFramesSerializer.load( file );
+			loaded = movie.keyframes;
+			if ( movie.easeFrames != null )
+				easeSpinner.setValue( Math.max( 0, movie.easeFrames ) );
 		}
 		catch ( final Exception e )
 		{

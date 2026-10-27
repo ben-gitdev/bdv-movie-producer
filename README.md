@@ -16,9 +16,10 @@ one small jar alongside it.
 * Fallback command: **Plugins › BigDataViewer › Movie Producer (keyframes)**,
   which attaches to the most recently active BDV window.
 * Add keyframes with **+**, set per-transition frame count and easing
-  (symmetric / ease-in / ease-out / soft …), plus one ease-in / ease-out
-  length in frames shared by all keyframes, preview in the viewer,
-  export / import keyframes as JSON (old JSON files from the fork still load),
+  (symmetric / ease-in / ease-out / soft …), plus one easing length in
+  frames shared by all keyframes, preview in the viewer,
+  export / import keyframes and the easing length as JSON (old JSON files
+  from the fork still load),
   and render a PNG sequence at any resolution with optional scale bar and box
   overlay.
 

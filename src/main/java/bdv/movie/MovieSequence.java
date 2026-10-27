@@ -80,8 +80,8 @@ public class MovieSequence
 	 * @param stride
 	 *            1 for full output, n to take every n-th frame (preview)
 	 * @param easeFrames
-	 *            number of frames the ease-in / ease-out curves spend
-	 *            accelerating / decelerating (the whole transition if longer)
+	 *            number of frames each curve spends accelerating and/or
+	 *            decelerating (see {@link Accel#apply})
 	 */
 	public static List< Step > build( final List< MovieFrame > keyframes, final int width, final int height,
 			final int fallbackW, final int fallbackH, final int stride, final int easeFrames )
