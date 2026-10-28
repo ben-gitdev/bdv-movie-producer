@@ -110,11 +110,17 @@ mvn package
 
 The plugin is `target/bigdataviewer-movie-producer-0.1.0-SNAPSHOT.jar`.
 
-No local toolchain? Fork this repository on GitHub: the included
-workflow (`.github/workflows/build.yml`) builds it and attaches the jar as a
-downloadable artifact under the **Actions** tab.
+Or simply download the compiled jar from the
+[Releases](https://github.com/ben-gitdev/bdv-movie-producer/releases).
+Pushing a tag like `v0.2.0` builds the jar and attaches it to the release of
+that name (`.github/workflows/release.yml`).
 
-Or simply download the compiled jar from the Releases.
+No local toolchain? Fork this repository on GitHub: the included
+workflow (`.github/workflows/build.yml`) builds it on every push and keeps the
+jar as a zipped artifact under the **Actions** tab. Chrome may block that zip
+as "dangerous" (it contains an executable `.jar`); choose **Keep** /
+**Download dangerous file** in Chrome's downloads list (`chrome://downloads`),
+or use the jar from a release instead.
 
 ## Install
 
