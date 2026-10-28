@@ -63,6 +63,7 @@ public class MovieRecorder
 			final ViewerPanel viewer,
 			final ConverterSetups setups,
 			final List< MovieFrame > keyframes,
+			final int easeFrames,
 			final int width,
 			final int height,
 			final boolean scaleBar,
@@ -76,7 +77,7 @@ public class MovieRecorder
 
 		final int canvasW = viewer.getDisplay().getWidth();
 		final int canvasH = viewer.getDisplay().getHeight();
-		final List< MovieSequence.Step > steps = MovieSequence.build( keyframes, width, height, canvasW, canvasH, 1 );
+		final List< MovieSequence.Step > steps = MovieSequence.build( keyframes, width, height, canvasW, canvasH, 1, easeFrames );
 
 		final Target target = new Target( width, height );
 		final int threads = Math.max( 1, Runtime.getRuntime().availableProcessors() );

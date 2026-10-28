@@ -56,6 +56,7 @@ public class ProduceMovieDialog extends JDialog
 
 	private final JSpinner strideSpinner = new JSpinner( new SpinnerNumberModel( 10, 1, 1000, 1 ) );
 	private final JSpinner sleepSpinner = new JSpinner( new SpinnerNumberModel( 50, 1, 5000, 10 ) );
+	private final JSpinner easeSpinner = new JSpinner( new SpinnerNumberModel( MovieFrame.DEFAULT_FRAMES / 2, 0, 100000, 1 ) );
 	private final JCheckBox interpolateTime = new JCheckBox( "timepoint", true );
 	private final JCheckBox captureDisplay = new JCheckBox( "channels & display settings", true );
 
@@ -102,9 +103,18 @@ public class ProduceMovieDialog extends JDialog
 		hint.setEnabled( false );
 		captureRow.add( hint );
 
-		final JPanel top = new JPanel( new GridLayout( 2, 1 ) );
+		// --- easing length, shared by all keyframes
+		final JPanel easeRow = new JPanel( new FlowLayout( FlowLayout.LEFT ) );
+		easeRow.add( new JLabel( "Easing length:" ) );
+		easeRow.add( easeSpinner );
+		easeRow.add( new JLabel( "frames (all keyframes)" ) );
+		easeSpinner.setToolTipText( "<html>Frames spent speeding up (ease-in) or slowing down (ease-out), or each of both (symmetric);<br>"
+				+ "the rest of the transition runs at constant speed. Shorter transitions ease throughout.</html>" );
+
+		final JPanel top = new JPanel( new GridLayout( 3, 1 ) );
 		top.add( previewRow );
 		top.add( captureRow );
+		top.add( easeRow );
 
 		// --- keyframe strip
 		final JPanel addRemove = new JPanel( new GridLayout( 2, 1, 0, 4 ) );
@@ -294,7 +304,8 @@ public class ProduceMovieDialog extends JDialog
 	{
 		if ( framePanels.size() < 2 )
 			return;
-		preview.play( keyframes(), ( Integer ) strideSpinner.getValue(), ( Integer ) sleepSpinner.getValue() );
+		preview.play( keyframes(), ( Integer ) strideSpinner.getValue(), ( Integer ) sleepSpinner.getValue(),
+				( Integer ) easeSpinner.getValue() );
 	}
 
 	// ------------------------------------------------------------ JSON
@@ -311,7 +322,7 @@ public class ProduceMovieDialog extends JDialog
 		lastDir = file.getParentFile();
 		try
 		{
-			MovieFramesSerializer.save( keyframes(), file );
+			MovieFramesSerializer.save( keyframes(), ( Integer ) easeSpinner.getValue(), file );
 		}
 		catch ( final Exception e )
 		{
@@ -330,7 +341,10 @@ public class ProduceMovieDialog extends JDialog
 		final List< MovieFrame > loaded;
 		try
 		{
-			loaded = MovieFramesSerializer.load( file );
+			final MovieFramesSerializer.Movie movie = MovieFramesSerializer.load( file );
+			loaded = movie.keyframes;
+			if ( movie.easeFrames != null )
+				easeSpinner.setValue( Math.max( 0, movie.easeFrames ) );
 		}
 		catch ( final Exception e )
 		{
@@ -418,10 +432,11 @@ public class ProduceMovieDialog extends JDialog
 			return;
 		}
 		lastDir = dir.getParentFile() != null ? dir.getParentFile() : dir;
-		record( keyframes(), ( Integer ) w.getValue(), ( Integer ) h.getValue(), scaleBar.isSelected(), box.isSelected(), dir );
+		record( keyframes(), ( Integer ) easeSpinner.getValue(), ( Integer ) w.getValue(), ( Integer ) h.getValue(),
+				scaleBar.isSelected(), box.isSelected(), dir );
 	}
 
-	private void record( final List< MovieFrame > frames, final int width, final int height,
+	private void record( final List< MovieFrame > frames, final int easeFrames, final int width, final int height,
 			final boolean scaleBar, final boolean box, final File dir )
 	{
 		cancelRecording.set( false );
@@ -435,7 +450,7 @@ public class ProduceMovieDialog extends JDialog
 			final long t0 = System.nanoTime();
 			try
 			{
-				final int n = MovieRecorder.record( viewer, setups, frames, width, height, scaleBar, box, dir,
+				final int n = MovieRecorder.record( viewer, setups, frames, easeFrames, width, height, scaleBar, box, dir,
 						p -> SwingUtilities.invokeLater( () -> {
 							progressBar.setValue( ( int ) ( 1000 * p ) );
 							progressBar.setString( String.format( "Recording\u2026 %.0f%%", 100 * p ) );
