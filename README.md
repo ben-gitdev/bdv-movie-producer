@@ -25,12 +25,13 @@ one small jar alongside it.
 
 *The movie producer in BDV's Tools menu (shortcut F7).*
 
-![The Produce Movie dialog with four keyframes](docs/images/produce-movie-dialog.png)
+![The Produce Movie dialog with five keyframes](docs/images/produce-movie-dialog.png)
 
-*The Produce Movie dialog: preview controls and what new keyframes capture
-(timepoint, channels & display settings) on top, the keyframe strip with
-per-transition frame count and easing, and export / import / record on the
-right. "(t=0, ch)" in a keyframe's title means it stores a timepoint and
+*The Produce Movie dialog: preview controls, what new keyframes capture
+(timepoint, channels & display settings) and the [easing length](#easing)
+shared by all keyframes on top, the keyframe strip with per-transition frame
+count and easing (here symmetric, ease-in, ease-out, symmetric), and
+export / import / record on the right. "(t=0, ch)" in a keyframe's title means it stores a timepoint and
 channel/display settings; right-click a keyframe to go to or update it.*
 
 ### Changes vs. the original fork
