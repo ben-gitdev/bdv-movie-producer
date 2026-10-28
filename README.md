@@ -16,12 +16,10 @@ one small jar alongside it.
 * Fallback command: **Plugins › BigDataViewer › Movie Producer (keyframes)**,
   which attaches to the most recently active BDV window.
 * Add keyframes with **+**, set per-transition frame count and easing
-  (symmetric / ease-in / ease-out / soft …), plus one easing length in
-  frames shared by all keyframes, preview in the viewer,
-  export / import keyframes and the easing length as JSON (old JSON files
-  from the fork still load),
-  and render a PNG sequence at any resolution with optional scale bar and box
-  overlay.
+  (symmetric / ease-in / ease-out and soft variants, see [Easing](#easing)),
+  preview in the viewer, export / import keyframes as JSON (old JSON files
+  from the fork still load), and render a PNG sequence at any resolution with
+  optional scale bar and box overlay.
 
 ![Produce Movie (keyframes) in the BDV Tools menu](docs/images/tools-menu.png)
 
@@ -67,6 +65,38 @@ channel/display settings; right-click a keyframe to go to or update it.*
     a warning). Keyframes without display settings leave the display as is.
   * While recording, BDV's live window shows the changing display ranges and
     colors (they are shared with the viewer); they are restored afterwards.
+* Easing: "slow start" / "slow end" (and their soft variants) are replaced by
+  ease-in / ease-out, and all curves use the shared easing length (see
+  [Easing](#easing)). Fork JSON files still load, but transitions that used
+  slow start / slow end play with ease-in / ease-out, and symmetric
+  transitions longer than 2 × 60 frames get a constant-speed middle.
+
+## Easing
+
+Each keyframe's dropdown sets how the movie moves from the previous keyframe
+into it; its "Frames" value (*F*) is the length of that transition. One
+**Easing length** (*N*, in frames, at the top of the dialog) applies to all
+keyframes: it is how long the movie takes to speed up or slow down.
+
+| Mode | Motion during the transition | If the transition is short |
+|---|---|---|
+| symmetric | speeds up over the first *N* frames, constant speed, slows to a stop over the last *N* frames | *F* ≤ 2*N*: eases over the whole transition (cosine S-curve) |
+| ease-in | speeds up over the first *N* frames, then constant speed into the keyframe | *F* ≤ *N*: speeds up throughout |
+| ease-out | constant speed, then slows to a stop over the last *N* frames | *F* ≤ *N*: slows down throughout |
+| soft symmetric / soft ease-in / soft ease-out | as above, with a gentler start / stop and a higher top speed | as above |
+
+* *N* = 0 gives constant speed in every mode. The default, 60, is half the
+  default transition length (120 frames).
+* Speed changes smoothly within a transition. Ease-in reaches its keyframe
+  at full speed, so follow it with ease-out (or soft ease-out) for one
+  smooth move through the keyframe; following it with a mode that starts
+  from rest makes the camera stop abruptly there.
+* The camera, display ranges and colors follow the easing; the timepoint is
+  always interpolated linearly.
+* Exported JSON stores *N* along with the keyframes
+  (`{"easeFrames": 60, "keyframes": [...]}`), and importing restores it.
+  Plain keyframe lists (earlier versions, the original fork) still load and
+  keep the current *N*. The original fork cannot read the new files.
 
 ## Build
 
